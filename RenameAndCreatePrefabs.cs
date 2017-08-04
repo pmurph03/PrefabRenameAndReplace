@@ -22,7 +22,8 @@ public class RenameAndCreatePrefabs : EditorWindow
     }
 
     private bool resetXforms;
-    
+
+    private string materialsFolder;
     private int numMaterials=1;
     private Material[] materials;
     private Material material;
@@ -40,8 +41,9 @@ public class RenameAndCreatePrefabs : EditorWindow
     private int numPrefabFolders=1;
     private string[] prefabLocation;
     private string prefabFolderPrefix = "Assets/Prefabs/";
+    private bool showAllMaterials;
 
- 
+    
     private bool matchMatBySuffix;
     private string matchMatBySuffixIdentifier;
 
@@ -65,14 +67,51 @@ public class RenameAndCreatePrefabs : EditorWindow
             materials = new Material[0];
         }
 
-        GUILayout.Label("Tools to rename a bunch of selected gameobjects, apply material, and create prefabs");
+        GUILayout.Label("Tools to rename a bunch of selected gameobjects, apply material, and create prefabs into folders");
         EditorGUILayout.LabelField("-");
         EditorGUILayout.LabelField("Material Settings", EditorStyles.boldLabel);
         EditorGUI.indentLevel++;
+
+       
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Materials Folder:");
+        EditorGUILayout.TextField(materialsFolder);
+        if (GUILayout.Button("Choose Material Folder"))
+        {
+            materialsFolder = EditorUtility.OpenFolderPanel("Material Folder:", "", "");
+            if (!string.IsNullOrEmpty(materialsFolder))
+            {
+                int index = materialsFolder.IndexOf("Assets", StringComparison.CurrentCulture);
+                if (index >= 0)
+                {
+                    materialsFolder = materialsFolder.Substring(index, materialsFolder.Length - index);
+                }
+                Debug.Log(materialsFolder);
+                string[] files = Directory.GetFiles(materialsFolder, "*.mat", SearchOption.AllDirectories);
+                int materialsFound = 0;
+                List<Material> materialList = new List<Material>();
+                foreach (string file in files)
+                {
+
+                    if (file.EndsWith(".mat"))
+                    {
+                        Material matLoad = (Material)AssetDatabase.LoadAssetAtPath(file, typeof(Material));
+                        if (matLoad != null)
+                        {
+                            materialList.Add(matLoad);
+                            materialsFound += 1;
+                        }
+                    }
+                }
+                numMaterials = materialsFound;
+                materials = materialList.ToArray();
+            }
+        }
+        EditorGUILayout.EndHorizontal();
         EditorGUILayout.BeginHorizontal();
         numMaterials = EditorGUILayout.IntField("# Materials:", numMaterials);
 
-        matchMatBySuffix = EditorGUILayout.Toggle("mats2obj by suffix", matchMatBySuffix);
+        matchMatBySuffix = EditorGUILayout.Toggle("Match by suffix", matchMatBySuffix);
         if (matchMatBySuffix)
         {
             matchMatBySuffixIdentifier = EditorGUILayout.TextField("Suffix Identifier:", matchMatBySuffixIdentifier);
@@ -88,10 +127,16 @@ public class RenameAndCreatePrefabs : EditorWindow
                 materials[i] = tempMaterial[i];
             }
         }
-        for (int i = 0; i < materials.Length; i++)
+        showAllMaterials = EditorGUILayout.Foldout(showAllMaterials, "Materials:");
+        if (showAllMaterials)
         {
-            materials[i] = (Material)EditorGUILayout.ObjectField("Material", materials[i], typeof(Material));
+            for (int i = 0; i < materials.Length; i++)
+            {
+                materials[i] = (Material)EditorGUILayout.ObjectField("Material", materials[i], typeof(Material));
+            }
+
         }
+
 
         EditorGUI.indentLevel--;
         EditorGUILayout.LabelField("-");
@@ -103,14 +148,14 @@ public class RenameAndCreatePrefabs : EditorWindow
         prefixFromMaterial = EditorGUILayout.Toggle("apnd matID prefx2sufx", prefixFromMaterial);
         if (prefixFromMaterial)
         {
-            prefixFromMatLength = EditorGUILayout.IntField("length of mat str to +", prefixFromMatLength);
+            prefixFromMatLength = EditorGUILayout.IntField("prefix in matID length", prefixFromMatLength);
             inverseSuffix = EditorGUILayout.Toggle("Start at mat end?", inverseSuffix);
         }
         EditorGUILayout.EndHorizontal();
 
         EditorGUI.indentLevel--;
         EditorGUILayout.LabelField("-");
-        EditorGUILayout.LabelField("Folder Settings", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Prefab Folder Settings", EditorStyles.boldLabel);
         EditorGUI.indentLevel++;
         EditorGUILayout.LabelField("From Object Name");
         EditorGUILayout.BeginHorizontal();
@@ -247,6 +292,9 @@ public class RenameAndCreatePrefabs : EditorWindow
 
     public void CreatePrefab(GameObject gameObj, Material mat)
     {
+        Vector3 originalPos = gameObj.transform.position;
+        Vector3 originalScale = gameObj.transform.localScale;
+        Quaternion originalRotation = gameObj.transform.rotation;
         originalName = gameObj.name;
         string name = gameObj.name;
         if (!String.IsNullOrEmpty(textToReplace) && !String.IsNullOrEmpty(newText))
@@ -302,6 +350,9 @@ public class RenameAndCreatePrefabs : EditorWindow
         UnityEngine.Object newPrefab = PrefabUtility.CreateEmptyPrefab(prefabCreationLocation + name + ".prefab");
         PrefabUtility.ReplacePrefab(gameObj, newPrefab, ReplacePrefabOptions.ConnectToPrefab);
         gameObj.name = originalName;
+        gameObj.transform.position = originalPos;
+        gameObj.transform.rotation = originalRotation;
+        gameObj.transform.localScale = originalScale;
     }
 
 }
